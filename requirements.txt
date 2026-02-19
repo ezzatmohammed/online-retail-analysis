@@ -1,0 +1,4 @@
+# --- Core Data Analysis ---
+Python==3.13.12
+NumPy==2.3.0
+pandas==3.0.1
