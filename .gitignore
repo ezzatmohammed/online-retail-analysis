@@ -209,3 +209,4 @@ __marimo__/
 
 # Other files to ignore
 structure.txt
+data\raw\online_retail_II.csv
