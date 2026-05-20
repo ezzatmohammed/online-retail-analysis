@@ -1,5 +1,13 @@
 import pandas as pd
 
+from src.features.rfm_features import build_rfm_features
+
+
+def _score_series(series: pd.Series, q: int) -> pd.Series:
+    ranked = series.rank(method="first")
+    scored = pd.qcut(ranked, q=q, labels=False, duplicates="drop")
+    return scored.astype("Int64") + 1
+
 
 def score_rfm(
     rfm: pd.DataFrame,
@@ -7,46 +15,21 @@ def score_rfm(
     frequency_col: str = "Frequency",
     monetary_col: str = "Monetary",
 ) -> pd.DataFrame:
-
     scored = rfm.copy()
 
-    # Recency → lower is better
-    scored["R_Score"] = pd.qcut(
-        scored[recency_col],
-        q=5,
-        labels=[5,4,3,2,1],
-        duplicates="drop"
-    )
+    # Recency: lower is better
+    scored["R_Score"] = _score_series(scored[recency_col], q=5)
 
-    scored["R_Score"] = (
-        scored["R_Score"].max()
-        - scored["R_Score"]
-    ) + 1
+    # Frequency: higher is better
+    scored["F_Score"] = _score_series(scored[frequency_col], q=5)
 
+    # Monetary: higher is better
+    scored["M_Score"] = _score_series(scored[monetary_col], q=5)
 
-    # Frequency → higher is better
-    scored["F_Score"] = (
-        pd.qcut(
-            scored[frequency_col],
-            q=4,
-            labels=False,
-            duplicates="drop"
-        ) + 1
-    )
+    scored["R_Score"] = scored["R_Score"].astype(int)
+    scored["F_Score"] = scored["F_Score"].astype(int)
+    scored["M_Score"] = scored["M_Score"].astype(int)
 
-
-    # Monetary → higher is better
-    scored["M_Score"] = (
-        pd.qcut(
-            scored[monetary_col],
-            q=5,
-            labels=False,
-            duplicates="drop"
-        ) + 1
-    )
-
-
-    # Combine scores
     scored["RFM_Score"] = (
         scored["R_Score"].astype(str)
         + scored["F_Score"].astype(str)
@@ -76,10 +59,14 @@ def assign_rfm_segment(row: pd.Series) -> str:
 
 def add_rfm_segments(scored_rfm: pd.DataFrame) -> pd.DataFrame:
     segmented = scored_rfm.copy()
-
-    segmented["Segment"] = segmented.apply(
-        assign_rfm_segment,
-        axis=1
-    )
-
+    segmented["Segment"] = segmented.apply(assign_rfm_segment, axis=1)
     return segmented
+
+
+def build_segmented_rfm(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build the customer-level RFM table, score it, and assign segments.
+    """
+    rfm = build_rfm_features(df)
+    scored = score_rfm(rfm)
+    return add_rfm_segments(scored)
